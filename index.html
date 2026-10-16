@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>دفتر برنامه روزانه</title>
+  <meta name="description" content="چک‌لیست کارهای روزانه با گزارش هفتگی، ماهانه و سالانه">
+  <meta name="theme-color" content="#e8467c" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a0f24" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="برنامه روزانه">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="preload" href="fonts/Vazirmatn.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- گرادیان‌های مشترک برای حلقه‌ها -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="gRose" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ff8ab0"/>
+        <stop offset=".5" stop-color="#e8467c"/>
+        <stop offset="1" stop-color="#a855f7"/>
+      </linearGradient>
+      <linearGradient id="gMint" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#47dcae"/>
+        <stop offset="1" stop-color="#12a97f"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <header class="top">
+    <div class="brand">
+      <img src="icons/icon-48.png" alt="" width="36" height="36">
+      <div>
+        <strong>دفتر برنامه روزانه</strong>
+        <small>هر روز یک قدم، همیشه ثبت‌شده</small>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="pill" type="button" data-action="install" id="btn-install-top">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+        <span>نصب</span>
+      </button>
+      <button class="icon-btn" type="button" data-action="update" id="btn-update-top" aria-label="به‌روزرسانی برنامه" title="به‌روزرسانی">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="views">
+    <section id="view-today" class="view active" aria-live="polite"></section>
+    <section id="view-week" class="view"></section>
+    <section id="view-month" class="view"></section>
+    <section id="view-year" class="view"></section>
+    <section id="view-settings" class="view"></section>
+  </main>
+
+  <nav class="tabbar" role="tablist" aria-label="بخش‌های برنامه">
+    <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="today">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>
+      <span>امروز</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="week">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      <span>هفتگی</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="month">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M9 9v12M15 9v12M3 15h18"/></svg>
+      <span>ماهانه</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="year">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/></svg>
+      <span>سالانه</span>
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+      <span>تنظیمات</span>
+    </button>
+  </nav>
+
+  <div class="sheet-backdrop" id="sheet" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div id="sheet-body"></div>
+      <button class="btn ghost" type="button" data-action="close-sheet">بستن</button>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+  <input type="file" id="file-import" accept="application/json,.json" hidden>
+
+  <noscript><p style="padding:24px;text-align:center">برای استفاده از این برنامه، جاوااسکریپت باید فعال باشد.</p></noscript>
+
+  <script src="localforage.min.js"></script>
+  <script src="jalali.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

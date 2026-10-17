@@ -8,7 +8,7 @@
   /* ============================================================
    * کارهای روزانه (ترتیب همان ترتیبی است که نمایش داده می‌شود)
    * ============================================================ */
-  var TASKS = [
+  var DEFAULT_TASKS = [
     { id: 'wake',    title: 'بیدار شدن و صبحانه خوردن', icon: '🌅', hue: 32 },
     { id: 'dishes',  title: 'شستن ظرف‌ها',               icon: '🍽️', hue: 200 },
     { id: 'cook',    title: 'پختن غذا',                  icon: '🍳', hue: 18 },
@@ -20,9 +20,53 @@
     { id: 'sweep',   title: 'جارو کردن خانه',            icon: '🧹', hue: 45 },
     { id: 'dinner',  title: 'خوردن شام',                 icon: '🍲', hue: 5 }
   ];
-  var N = TASKS.length;
-  var TASK_IDS = {};
-  TASKS.forEach(function (t) { TASK_IDS[t.id] = true; });
+  /* همهٔ کارها، از جمله کارهای حذف‌شده (برای حفظ سابقه در گزارش‌ها).
+   * هر کار بازهٔ فعال بودن دارد: from (اولین روز) و to (آخرین روز)؛ null یعنی بدون محدودیت. */
+  var TASKS = [];
+  var ICONS = ['🌅', '🍽️', '🍳', '🥗', '✨', '👕', '📚', '💅', '🧹', '🍲',
+               '🛒', '🧺', '🪴', '💧', '☕', '🛏️', '🧼', '📞', '🎨', '🧵',
+               '🍎', '💊', '🌙', '📝', '🚿', '🧽', '🍰', '🎧', '🌷', '⭐'];
+  var HUES = [330, 200, 140, 280, 45, 18, 255, 5, 170, 95];
+  var FONT_PX = { sm: '14px', md: '16px', lg: '18px', xl: '20px' };
+  var FONT_LABEL = { sm: 'کوچک', md: 'متوسط', lg: 'بزرگ', xl: 'خیلی بزرگ' };
+
+  function isIso(s) { return typeof s === 'string' && !isNaN(J.fromIso(s)); }
+
+  function prepTask(t) {
+    t.f = t.from ? J.fromIso(t.from) : -Infinity;
+    t.e = t.to ? J.fromIso(t.to) : Infinity;
+    return t;
+  }
+  function resetTasks() {
+    TASKS = DEFAULT_TASKS.map(function (t) {
+      return prepTask({ id: t.id, title: t.title, icon: t.icon, hue: t.hue, from: null, to: null });
+    });
+  }
+  function sanitizeTasks(arr) {
+    if (!Array.isArray(arr) || !arr.length) return null;
+    var seen = Object.create(null), out = [];
+    arr.forEach(function (t) {
+      if (!t || typeof t.id !== 'string' || typeof t.title !== 'string' || !t.title.trim() || seen[t.id]) return;
+      seen[t.id] = true;
+      out.push(prepTask({
+        id: t.id.slice(0, 40), title: t.title.trim().slice(0, 40),
+        icon: (typeof t.icon === 'string' && t.icon) ? t.icon.slice(0, 8) : '⭐',
+        hue: typeof t.hue === 'number' ? t.hue : 330,
+        from: isIso(t.from) ? t.from : null, to: isIso(t.to) ? t.to : null
+      }));
+    });
+    return out.length ? out : null;
+  }
+  function isActive(t, j) { return j >= t.f && j <= t.e; }
+  function dayTasks(j) { return TASKS.filter(function (t) { return isActive(t, j); }); }
+  function findTask(id) {
+    for (var i = 0; i < TASKS.length; i++) if (TASKS[i].id === id) return TASKS[i];
+    return null;
+  }
+  function doneCount(j) {
+    var s = doneSet(j);
+    return dayTasks(j).filter(function (t) { return s.has(t.id); }).length;
+  }
 
   var WD = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه'];
   var WD_S = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
@@ -40,7 +84,10 @@
     download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>',
     refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
     save: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4l4 4M5 15v4a2 2 0 002 2h10a2 2 0 002-2v-4"/></svg>',
-    upload: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>'
+    upload: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16v4zM13.5 6.5l4 4"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
   };
 
   /* ============================================================
@@ -70,7 +117,7 @@
     monthM: 0,
     yearY: 0,
     days: new Map(),               /* jdn → Set از شناسهٔ کارهای انجام‌شده */
-    meta: { firstUse: null, name: '' },
+    meta: { firstUse: null, name: '', font: 'md' },
     reg: null,
     updating: false,
     applying: false
@@ -107,11 +154,15 @@
       if (key.indexOf('day:') === 0) {
         var j = J.fromIso(key.slice(4));
         if (!isNaN(j) && val && Array.isArray(val.done)) {
-          state.days.set(j, new Set(val.done.filter(function (id) { return TASK_IDS[id]; })));
+          state.days.set(j, new Set(val.done.filter(function (id) { return typeof id === 'string'; })));
         }
       } else if (key === 'meta' && val && typeof val === 'object') {
         state.meta.firstUse = val.firstUse || null;
         state.meta.name = typeof val.name === 'string' ? val.name : '';
+        if (FONT_PX[val.font]) state.meta.font = val.font;
+      } else if (key === 'tasks') {
+        var list = sanitizeTasks(val);
+        if (list) TASKS = list;
       }
     });
   }
@@ -120,8 +171,14 @@
     return store.setItem('day:' + J.toIso(j), { done: Array.from(doneSet(j)), updated: Date.now() });
   }
   function saveMeta() {
-    return store.setItem('meta', { firstUse: state.meta.firstUse, name: state.meta.name });
+    return store.setItem('meta', { firstUse: state.meta.firstUse, name: state.meta.name, font: state.meta.font });
   }
+  function plainTasks() {
+    return TASKS.map(function (t) {
+      return { id: t.id, title: t.title, icon: t.icon, hue: t.hue, from: t.from || null, to: t.to || null };
+    });
+  }
+  function saveTasks() { return store.setItem('tasks', plainTasks()); }
 
   function requestPersistence() {
     try {
@@ -135,22 +192,28 @@
   function stats(startJ, endJ) {
     var lo = Math.max(startJ, firstJ());
     var hi = Math.min(endJ, state.today);
-    var perTask = TASKS.map(function () { return { done: [], miss: [] }; });
+    var byId = new Map();
     var perDay = new Map();
-    var totalDone = 0, counted = 0, full = 0;
+    var totalDone = 0, totalPossible = 0, counted = 0, full = 0;
     for (var j = lo; j <= hi; j++) {
+      var act = dayTasks(j);
+      if (!act.length) continue;
       counted++;
       var set = doneSet(j), c = 0;
-      for (var i = 0; i < N; i++) {
-        if (set.has(TASKS[i].id)) { perTask[i].done.push(j); c++; }
-        else perTask[i].miss.push(j);
+      for (var i = 0; i < act.length; i++) {
+        var t = act[i], e = byId.get(t.id);
+        if (!e) { e = { task: t, done: [], miss: [] }; byId.set(t.id, e); }
+        if (set.has(t.id)) { e.done.push(j); c++; }
+        else e.miss.push(j);
       }
-      perDay.set(j, c);
+      perDay.set(j, { c: c, n: act.length });
       totalDone += c;
-      if (c === N) full++;
+      totalPossible += act.length;
+      if (c === act.length) full++;
     }
+    var perTask = TASKS.filter(function (t) { return byId.has(t.id); }).map(function (t) { return byId.get(t.id); });
     return { lo: lo, hi: hi, counted: counted, perTask: perTask, perDay: perDay,
-             totalDone: totalDone, totalPossible: counted * N, full: full };
+             totalDone: totalDone, totalPossible: totalPossible, full: full };
   }
 
   /* ============================================================
@@ -197,7 +260,8 @@
 
   function highlightsHTML(st) {
     if (!st.counted) return '';
-    var arr = st.perTask.map(function (t, i) { return { task: TASKS[i], p: pct(t.done.length, st.counted) }; });
+    var arr = st.perTask.map(function (t) { return { task: t.task, p: pct(t.done.length, t.done.length + t.miss.length) }; });
+    if (!arr.length) return '';
     var best = arr.slice().sort(function (a, b) { return b.p - a.p; })[0];
     var worst = arr.slice().sort(function (a, b) { return a.p - b.p; })[0];
     if (best.p === worst.p) return '';
@@ -220,8 +284,8 @@
   }
 
   function taskRowsHTML(st, mode) {
-    return '<div class="tasklist">' + TASKS.map(function (t, i) {
-      var d = st.perTask[i], p = pct(d.done.length, st.counted);
+    return '<div class="tasklist">' + st.perTask.map(function (d) {
+      var t = d.task, p = pct(d.done.length, d.done.length + d.miss.length);
       var cd = chipsFor(d.done, mode), cm = chipsFor(d.miss, mode);
       return '<details class="trow"><summary>' +
         '<span class="ico" style="--h:' + t.hue + '">' + t.icon + '</span>' +
@@ -261,18 +325,19 @@
     return WD[J.weekdayIndex(j)];
   }
 
-  function noteFor(c, isToday) {
-    if (c === N) return 'آفرین! همهٔ کارها انجام شد 🎉';
+  function noteFor(c, n, isToday) {
+    if (!n) return 'هنوز کاری تعریف نشده؛ از بخش تنظیمات کار اضافه کن';
+    if (c === n) return 'آفرین! همهٔ کارها انجام شد 🎉';
     if (c === 0) return isToday ? 'با یک قدم کوچک شروع کن 🌱' : 'برای این روز هنوز کاری ثبت نشده';
-    if (c >= N * 0.7) return 'تقریباً تمومه، کمی دیگه! ✨';
-    if (c >= N * 0.4) return 'داری عالی پیش می‌ری، ادامه بده 💪';
+    if (c >= n * 0.7) return 'تقریباً تمومه، کمی دیگه! ✨';
+    if (c >= n * 0.4) return 'داری عالی پیش می‌ری، ادامه بده 💪';
     return 'شروع خوبی بود، ادامه بده 🌸';
   }
 
   function renderToday() {
     var el = $('#view-today');
     var j = state.viewDay, isToday = j === state.today;
-    var g = J.d2j(j), set = doneSet(j), c = set.size;
+    var g = J.d2j(j), set = doneSet(j), list = dayTasks(j), n = list.length, c = doneCount(j);
     var name = state.meta.name ? '، ' + esc(state.meta.name) : '';
     var greet = isToday ? greeting() + name + ' 🌸' : 'ثبت کارهای ' + relLabel(j);
 
@@ -282,9 +347,9 @@
           '<p class="greet">' + greet + '</p>' +
           '<h1><span>' + WD[J.weekdayIndex(j)] + '</span> ' + fa(g.jd) + ' ' + MONTHS[g.jm - 1] + '</h1>' +
           '<p class="sub">' + fa(g.jy) + '</p>' +
-          '<p class="note" id="today-note">' + noteFor(c, isToday) + '</p>' +
+          '<p class="note" id="today-note">' + noteFor(c, n, isToday) + '</p>' +
         '</div>' +
-        '<div id="today-ring">' + ringHTML(c / N, fa(c) + '/' + fa(N), 'کار انجام شد', '', c === N) + '</div>' +
+        '<div id="today-ring">' + ringHTML(n ? c / n : 0, fa(c) + '/' + fa(n), 'کار انجام شد', '', n > 0 && c === n) + '</div>' +
       '</div>' +
       '<div class="daynav">' +
         '<button class="nav-btn" type="button" data-action="day-prev" aria-label="روز قبل"' + (j > state.today - 400 ? '' : ' disabled') + '>' + ICON.prev + '</button>' +
@@ -293,7 +358,7 @@
         '</div>' +
         '<button class="nav-btn" type="button" data-action="day-next" aria-label="روز بعد"' + (isToday ? ' disabled' : '') + '>' + ICON.next + '</button>' +
       '</div>' +
-      '<ul class="tasks">' + TASKS.map(function (t, i) {
+      '<ul class="tasks">' + list.map(function (t, i) {
         var done = set.has(t.id);
         return '<li class="task' + (done ? ' done' : '') + '" style="--i:' + i + ';--h:' + t.hue + '" data-id="' + t.id + '">' +
           '<button class="task-btn" type="button" data-task="' + t.id + '" aria-pressed="' + done + '">' +
@@ -301,14 +366,14 @@
             '<span class="label">' + esc(t.title) + '</span>' +
             '<span class="check">' + ICON.check + '</span>' +
           '</button></li>';
-      }).join('') + '</ul>';
+      }).join('') + '</ul>' + (n ? '' : emptyHTML('برای این روز کاری تعریف نشده است.<br>از بخش «تنظیمات» می‌توانی کار اضافه کنی.'));
 
     animateRings(el);
   }
 
   function updateTodayDynamic() {
     var el = $('#view-today');
-    var j = state.viewDay, set = doneSet(j), c = set.size;
+    var j = state.viewDay, set = doneSet(j), n = dayTasks(j).length, c = doneCount(j);
     $$('.task', el).forEach(function (li) {
       var done = set.has(li.dataset.id);
       li.classList.toggle('done', done);
@@ -316,28 +381,28 @@
     });
     var ring = $('#today-ring .ring', el);
     if (ring) {
-      ring.classList.toggle('full', c === N);
-      $('.lbl b', ring).textContent = fa(c) + '/' + fa(N);
-      $('.bar', ring).style.strokeDashoffset = (RING_C * (1 - c / N)).toFixed(2);
+      ring.classList.toggle('full', n > 0 && c === n);
+      $('.lbl b', ring).textContent = fa(c) + '/' + fa(n);
+      $('.bar', ring).style.strokeDashoffset = (RING_C * (1 - (n ? c / n : 0))).toFixed(2);
     }
     var note = $('#today-note', el);
-    if (note) note.textContent = noteFor(c, j === state.today);
+    if (note) note.textContent = noteFor(c, n, j === state.today);
   }
 
   function toggleTask(id) {
-    if (!TASK_IDS[id]) return;
     var j = state.viewDay;
+    var active = dayTasks(j), n = active.length;
+    if (!active.some(function (t) { return t.id === id; })) return;
     var set = state.days.get(j);
     if (!set) { set = new Set(); state.days.set(j, set); }
-    var wasFull = set.size === N;
+    var wasFull = doneCount(j) === n;
     if (set.has(id)) set.delete(id); else set.add(id);
 
     var metaChanged = false;
     if (j < firstJ()) { state.meta.firstUse = J.toIso(j); metaChanged = true; }
 
     updateTodayDynamic();
-    try { if (navigator.vibrate) navigator.vibrate(set.has(id) ? 12 : 6); } catch (e) { /* نادیده */ }
-    if (!wasFull && set.size === N) celebrate();
+    if (!wasFull && doneCount(j) === n) celebrate();
 
     saveDay(j).catch(function () { toast('ذخیره نشد؛ لطفاً دوباره تلاش کن.'); });
     if (metaChanged) saveMeta().catch(function () {});
@@ -379,11 +444,11 @@
           (dj <= state.today ? ' data-goto="' + dj + '"' : ' disabled') + ' aria-label="' + WD[i] + '">' +
           '<span>' + WD_S[i] + '</span><small>' + fa(J.d2j(dj).jd) + '</small></button>';
       }
-      var rows = TASKS.map(function (t) {
-        var cells = '';
+      var rows = st.perTask.map(function (pt) {
+        var t = pt.task, cells = '';
         for (var k = 0; k < 7; k++) {
           var jj = s + k;
-          var counted = jj >= st.lo && jj <= st.hi;
+          var counted = jj >= st.lo && jj <= st.hi && isActive(t, jj);
           var done = doneSet(jj).has(t.id);
           if (counted && done) cells += '<span class="cell done" title="انجام شد">' + ICON.check + '</span>';
           else if (counted) cells += '<span class="cell miss" title="انجام نشد">' + ICON.x + '</span>';
@@ -422,12 +487,12 @@
       var lead = J.weekdayIndex(s), cells = '';
       for (var b = 0; b < lead; b++) cells += '<span aria-hidden="true"></span>';
       for (var d = 1; d <= len; d++) {
-        var j = s + d - 1, counted = j >= st.lo && j <= st.hi;
-        var c = st.perDay.get(j) || 0, r = c / N;
+        var j = s + d - 1, pd = st.perDay.get(j), counted = !!pd;
+        var c = pd ? pd.c : 0, r = pd ? pd.c / pd.n : 0;
         var cls = [];
         if (!counted) cls.push('na');
         else if (c === 0) cls.push('z');
-        else { if (r >= 0.55) cls.push('hi'); if (c === N) cls.push('full'); }
+        else { if (r >= 0.55) cls.push('hi'); if (c === pd.n) cls.push('full'); }
         if (j === state.today) cls.push('today');
         cells += '<button type="button" class="' + cls.join(' ') + '" style="--r:' + r.toFixed(2) + '"' +
           (j <= state.today ? ' data-goto="' + j + '"' : ' disabled') +
@@ -515,9 +580,22 @@
       '</div>' +
 
       '<div class="card set-card">' +
+        '<div class="set-head"><span class="set-ico">📝</span><div><strong>کارهای روزانه</strong>' +
+        '<small>کار جدید اضافه کن، اسم یا شکلک کارها را عوض کن، یا کاری را حذف کن. سابقهٔ روزهای قبل در گزارش‌ها می‌ماند.</small></div></div>' +
+        '<div id="task-mgr">' + managerListHTML() + '</div>' +
+        '<button class="btn primary" type="button" data-action="task-add">' + ICON.plus + '<span>افزودن کار جدید</span></button>' +
+      '</div>' +
+
+      '<div class="card set-card">' +
+        '<div class="set-head"><span class="set-ico">🔠</span><div><strong>اندازهٔ نوشته‌ها</strong>' +
+        '<small>اندازهٔ حروف را مطابق راحتی چشمت انتخاب کن.</small></div></div>' +
+        fontHTML() +
+      '</div>' +
+
+      '<div class="card set-card">' +
         '<div class="set-head"><span class="set-ico">💗</span><div><strong>اسم تو</strong>' +
         '<small>اگر بنویسی، برنامه هر روز با اسم خودت سلام می‌کند.</small></div></div>' +
-        '<input class="field" id="name-input" type="text" maxlength="30" autocomplete="off" placeholder="مثلاً: مریم" value="' + esc(state.meta.name) + '">' +
+        '<input class="field" id="name-input" type="text" maxlength="30" autocomplete="off" value="' + esc(state.meta.name) + '">' +
       '</div>' +
 
       '<div class="card set-card">' +
@@ -628,6 +706,120 @@
   /* ============================================================
    * نصب برنامه (PWA)
    * ============================================================ */
+  /* ============================================================
+   * مدیریت کارها و اندازهٔ نوشته
+   * ============================================================ */
+  function activeNow() { return TASKS.filter(function (t) { return isActive(t, state.today); }); }
+
+  function managerListHTML() {
+    var list = activeNow();
+    if (!list.length) return '<p class="hint">هنوز کاری نداری. با دکمهٔ زیر یک کار اضافه کن.</p>';
+    return '<div class="mgr">' + list.map(function (t) {
+      return '<div class="mrow"><span class="ico" style="--h:' + t.hue + '">' + t.icon + '</span>' +
+        '<span class="mname">' + esc(t.title) + '</span>' +
+        '<button class="mbtn" type="button" data-action="task-edit" data-id="' + esc(t.id) + '" aria-label="ویرایش ' + esc(t.title) + '">' + ICON.edit + '</button>' +
+        '<button class="mbtn danger" type="button" data-action="task-del" data-id="' + esc(t.id) + '" aria-label="حذف ' + esc(t.title) + '">' + ICON.trash + '</button></div>';
+    }).join('') + '</div>';
+  }
+
+  function openTaskSheet(id) {
+    var t = id ? findTask(id) : null;
+    if (id && !t) return;
+    state.editId = t ? t.id : null;
+    state.pickIcon = t ? t.icon : ICONS[0];
+    var icons = ICONS.slice();
+    if (icons.indexOf(state.pickIcon) < 0) icons.unshift(state.pickIcon);
+    openSheet(
+      '<h3 id="sheet-title">' + (t ? 'ویرایش کار' : 'افزودن کار جدید') + '</h3>' +
+      '<label class="lbl-f" for="task-title">نام کار</label>' +
+      '<input class="field" id="task-title" type="text" maxlength="40" autocomplete="off" value="' + (t ? esc(t.title) : '') + '">' +
+      '<span class="lbl-f">شکلک</span>' +
+      '<div class="icons" role="radiogroup" aria-label="شکلک">' + icons.map(function (ic) {
+        var on = ic === state.pickIcon;
+        return '<button type="button" class="ic' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on + '" data-icon="' + ic + '">' + ic + '</button>';
+      }).join('') + '</div>' +
+      '<button class="btn primary" type="button" data-action="task-save">' + ICON.check + '<span>ذخیره</span></button>'
+    );
+    var inp = $('#task-title');
+    if (inp && !t) setTimeout(function () { inp.focus(); }, 60);
+  }
+
+  function pickIcon(ic) {
+    state.pickIcon = ic;
+    $$('.ic').forEach(function (b) {
+      var on = b.dataset.icon === ic;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', on);
+    });
+  }
+
+  function saveTaskForm() {
+    var inp = $('#task-title');
+    var title = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
+    if (!title) { toast('اسم کار را بنویس.'); if (inp) inp.focus(); return; }
+    if (state.editId) {
+      var t = findTask(state.editId);
+      if (t) { t.title = title; t.icon = state.pickIcon; }
+    } else {
+      TASKS.push(prepTask({
+        id: 't' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36),
+        title: title, icon: state.pickIcon, hue: HUES[TASKS.length % HUES.length],
+        from: J.toIso(state.today), to: null
+      }));
+    }
+    saveTasks().catch(function () { toast('ذخیره نشد؛ لطفاً دوباره تلاش کن.'); });
+    closeSheet();
+    renderAllViews();
+    toast('ذخیره شد ✓');
+  }
+
+  function openDeleteSheet(id) {
+    var t = findTask(id);
+    if (!t) return;
+    openSheet(
+      '<h3 id="sheet-title">حذف «' + esc(t.title) + '»؟</h3>' +
+      '<p>این کار از امروز به بعد در لیست روزانه نمی‌آید. سابقهٔ روزهای گذشته در گزارش‌ها باقی می‌ماند.</p>' +
+      '<button class="btn danger" type="button" data-action="task-del-confirm" data-id="' + esc(t.id) + '">' + ICON.trash + '<span>بله، حذف شود</span></button>'
+    );
+  }
+
+  function deleteTask(id) {
+    var t = findTask(id);
+    if (!t) return;
+    if (t.f >= state.today) TASKS = TASKS.filter(function (x) { return x.id !== id; });
+    else { t.to = J.toIso(state.today - 1); prepTask(t); }
+    saveTasks().catch(function () { toast('ذخیره نشد؛ لطفاً دوباره تلاش کن.'); });
+    closeSheet();
+    renderAllViews();
+    toast('کار حذف شد');
+  }
+
+  function fontHTML() {
+    return '<div class="seg" role="radiogroup" aria-label="اندازهٔ نوشته">' + ['sm', 'md', 'lg', 'xl'].map(function (k) {
+      var on = state.meta.font === k;
+      return '<button type="button" class="' + (on ? 'on' : '') + '" role="radio" aria-checked="' + on + '" data-font="' + k + '">' + FONT_LABEL[k] + '</button>';
+    }).join('') + '</div>' +
+      '<p class="font-sample">نمونه: همین اندازهٔ نوشته را می‌بینی 🌸</p>';
+  }
+
+  function applyFont() {
+    var px = FONT_PX[state.meta.font] || FONT_PX.md;
+    document.documentElement.style.fontSize = px;
+    try { localStorage.setItem('bj-font', px); } catch (e) { /* مهم نیست */ }
+  }
+
+  function setFont(k) {
+    if (!FONT_PX[k]) return;
+    state.meta.font = k;
+    applyFont();
+    saveMeta().catch(function () {});
+    $$('.seg button').forEach(function (b) {
+      var on = b.dataset.font === k;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', on);
+    });
+  }
+
   var deferredPrompt = null;
 
   function refreshInstallUI() {
@@ -800,8 +992,9 @@
    * پشتیبان‌گیری و بازیابی
    * ============================================================ */
   function exportBackup() {
-    var data = { app: 'bullet-journal', version: 1, exportedAt: new Date().toISOString(),
-                 meta: { firstUse: state.meta.firstUse, name: state.meta.name }, days: {} };
+    var data = { app: 'bullet-journal', version: 2, exportedAt: new Date().toISOString(),
+                 meta: { firstUse: state.meta.firstUse, name: state.meta.name, font: state.meta.font },
+                 tasks: plainTasks(), days: {} };
     state.days.forEach(function (set, j) { if (set.size) data.days[J.toIso(j)] = Array.from(set); });
     var name = 'bullet-journal-backup-' + J.toIso(state.today) + '.json';
     var file = new File([JSON.stringify(data, null, 2)], name, { type: 'application/json' });
@@ -838,10 +1031,12 @@
       var writes = entries.map(function (iso) {
         var j = J.fromIso(iso);
         if (j < minJ) minJ = j;
-        state.days.set(j, new Set(data.days[iso].filter(function (id) { return TASK_IDS[id]; })));
+        state.days.set(j, new Set(data.days[iso].filter(function (id) { return typeof id === 'string'; })));
         return saveDay(j);
       });
       state.meta.firstUse = J.toIso(minJ);
+      var restored = sanitizeTasks(data.tasks);
+      if (restored) { TASKS = restored; writes.push(saveTasks()); }
       if (!state.meta.name && data.meta && typeof data.meta.name === 'string') state.meta.name = data.meta.name.slice(0, 30);
       writes.push(saveMeta());
       return Promise.all(writes).then(function () {
@@ -894,16 +1089,23 @@
       case 'export': exportBackup(); break;
       case 'import': $('#file-import').click(); break;
       case 'close-sheet': closeSheet(); break;
+      case 'task-add': openTaskSheet(null); break;
+      case 'task-edit': openTaskSheet(target.dataset.id); break;
+      case 'task-save': saveTaskForm(); break;
+      case 'task-del': openDeleteSheet(target.dataset.id); break;
+      case 'task-del-confirm': deleteTask(target.dataset.id); break;
     }
   }
 
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-action],[data-tab],[data-task],[data-goto],[data-month]');
+    var t = e.target.closest('[data-action],[data-tab],[data-task],[data-goto],[data-month],[data-font],[data-icon]');
     if (e.target.id === 'sheet') { closeSheet(); return; }
     if (!t || t.disabled) return;
     if (t.dataset.tab) setTab(t.dataset.tab);
     else if (t.dataset.task) toggleTask(t.dataset.task);
     else if (t.dataset.goto) gotoDay(parseInt(t.dataset.goto, 10));
+    else if (t.dataset.font) setFont(t.dataset.font);
+    else if (t.dataset.icon) pickIcon(t.dataset.icon);
     else if (t.dataset.month) {
       var parts = t.dataset.month.split('-');
       state.monthY = parseInt(parts[0], 10);
@@ -953,11 +1155,13 @@
    * ============================================================ */
   function boot() {
     initPeriods();
+    resetTasks();
     initStore();
     store.ready().catch(function () {}).then(loadAll).catch(function (err) {
       console.warn('خواندن اطلاعات ناموفق بود', err);
       toast('خواندن اطلاعات ذخیره‌شده با مشکل روبه‌رو شد.');
     }).then(function () {
+      applyFont();
       if (!state.meta.firstUse) {
         state.meta.firstUse = J.toIso(state.today);
         saveMeta().catch(function () {});
